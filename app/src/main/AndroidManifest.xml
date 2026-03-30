@@ -4,7 +4,7 @@
     <application
         android:name=".StudentCopilotApp"
         android:allowBackup="true"
-        android:label="Student Copilot"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.StudentCopilot">
 

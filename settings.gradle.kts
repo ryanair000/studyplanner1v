@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "StudentCopilot"
+rootProject.name = "Pangia"
 include(":app")

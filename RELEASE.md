@@ -1,4 +1,4 @@
-# Student Copilot Release Checklist
+# Pangia Release Checklist
 
 Current status as of 2026-03-30:
 - The app now targets Android 15 / API 35.

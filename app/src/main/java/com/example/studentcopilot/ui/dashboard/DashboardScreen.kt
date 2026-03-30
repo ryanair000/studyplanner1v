@@ -38,7 +38,7 @@ fun DashboardScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         TopAppBar(
-            title = { Text("Student Copilot") },
+            title = { Text("Pangia") },
         )
 
         Column(
