@@ -36,12 +36,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.studentcopilot.ui.auth.AuthScreen
 import com.example.studentcopilot.ui.assignments.AssignmentsScreen
+import com.example.studentcopilot.ui.calendar.CalendarScreen
 import com.example.studentcopilot.ui.courses.CoursesScreen
 import com.example.studentcopilot.ui.dashboard.DashboardScreen
 import com.example.studentcopilot.ui.exams.ExamsScreen
 import com.example.studentcopilot.viewmodel.AssignmentViewModel
 import com.example.studentcopilot.viewmodel.AppUpdateViewModel
 import com.example.studentcopilot.viewmodel.AuthViewModel
+import com.example.studentcopilot.viewmodel.CalendarViewModel
 import com.example.studentcopilot.viewmodel.CourseViewModel
 import com.example.studentcopilot.viewmodel.DashboardViewModel
 import com.example.studentcopilot.viewmodel.ExamViewModel
@@ -198,6 +200,41 @@ fun AppNavigation() {
             composable(Screen.Assignments.route) {
                 val assignmentViewModel: AssignmentViewModel = viewModel()
                 AssignmentsScreen(viewModel = assignmentViewModel)
+            }
+            composable(Screen.Calendar.route) {
+                val calendarViewModel: CalendarViewModel = viewModel()
+                CalendarScreen(
+                    viewModel = calendarViewModel,
+                    currentUserEmail = authState.currentUserEmail,
+                    isGuestMode = authState.isGuestMode,
+                    onOpenAssignments = {
+                        navController.navigate(Screen.Assignments.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onOpenCourses = {
+                        navController.navigate(Screen.Courses.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    onOpenExams = {
+                        navController.navigate(Screen.Exams.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
             composable(Screen.Exams.route) {
                 val examViewModel: ExamViewModel = viewModel()
