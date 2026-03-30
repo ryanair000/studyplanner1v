@@ -79,6 +79,12 @@ class MainFlowTest {
         }
         composeTestRule.onNodeWithText(assignmentTitle).assertIsDisplayed()
 
+        composeTestRule.onNodeWithText("Exams").performClick()
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithText(examTitle).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText(examTitle).assertIsDisplayed()
+
         composeTestRule.onNodeWithText("Courses").performClick()
         composeTestRule.onNodeWithContentDescription("Delete course").performClick()
         composeTestRule.onNodeWithText("Delete course?").assertIsDisplayed()
@@ -96,5 +102,15 @@ class MainFlowTest {
 
         assertEquals(0, assignmentCount)
         assertEquals(0, examCount)
+    }
+
+    @Test
+    fun examsTabGuidesUsersToCoursesWhenNothingExists() {
+        composeTestRule.onNodeWithText("Exams").performClick()
+        composeTestRule.onNodeWithText("Create a course before scheduling exams.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Go To Courses").assertIsDisplayed()
+
+        composeTestRule.onNodeWithText("Go To Courses").performClick()
+        composeTestRule.onNodeWithText("No courses yet.\nTap + to add your first course.").assertIsDisplayed()
     }
 }

@@ -1,21 +1,33 @@
 # Student Copilot Release Checklist
 
 Current status as of 2026-03-30:
-- Debug build, unit tests, and Android test APK compilation are working locally.
-- Google Play release is still blocked because the app targets API 34. New Play submissions currently require API 35 or higher.
+- The app now targets Android 15 / API 35.
+- The build uses Android Gradle Plugin 8.6.0 with Gradle 8.7.
+- Local release signing is configured through ignored files:
+  - `keystore.properties`
+  - `release/upload-keystore.jks`
+- Verified release artifacts:
+  - `app/build/outputs/bundle/release/app-release.aab`
+  - `app/build/outputs/apk/release/app-release.apk`
 
-Before publishing:
-1. Install Android SDK Platform 35 (or a newer stable platform) in Android Studio SDK Manager.
-2. Update `compileSdk` and `targetSdk` in `app/build.gradle.kts` to 35 or higher.
-3. Create an upload keystore.
-4. Copy `keystore.properties.example` to `keystore.properties` and fill in the real values.
-5. Build a signed release bundle with `.\gradlew.bat bundleRelease`.
-6. Upload the `.aab` file to Play Console.
+Verified locally:
+1. `.\gradlew.bat testDebugUnitTest --no-daemon --console=plain`
+2. `.\gradlew.bat assembleDebug --no-daemon --console=plain`
+3. `.\gradlew.bat assembleDebugAndroidTest --no-daemon --console=plain`
+4. `.\gradlew.bat assembleRelease --no-daemon --console=plain`
+5. `.\gradlew.bat bundleRelease --no-daemon --console=plain`
 
-If your Play Console account is a new personal account:
-- Run a closed test with at least 12 opted-in testers for 14 continuous days before applying for production access.
+Release assets to back up now:
+1. `keystore.properties`
+2. `release/upload-keystore.jks`
 
-Suggested first-release checks:
-- Confirm the course, assignment, and delete flows on a real device.
-- Decide whether to ship the Exams tab now or hide it until it is fully configured.
-- Prepare Play listing assets: title, short description, full description, icon, screenshots, and privacy details.
+Manual steps before Play submission:
+1. Install the release APK on a real device and smoke test the main flows.
+2. Upload `app/build/outputs/bundle/release/app-release.aab` to Play Console.
+3. Complete the Play listing: app name, descriptions, screenshots, icon, feature graphic, contact details, and privacy answers.
+4. Fill in the Data safety section based on what the app stores and transmits.
+5. If your Play Console account is a new personal account, complete closed testing before requesting production access.
+
+Known limits:
+- Instrumentation coverage is compiled and ready, but it was not executed because no emulator or device was connected through `adb`.
+- Builds on this Windows machine may show a Kotlin daemon fallback warning; the build still completes successfully.

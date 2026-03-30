@@ -23,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.studentcopilot.data.local.entity.CourseEntity
 import com.example.studentcopilot.util.formatLocalDateMillis
@@ -81,7 +82,9 @@ fun AddExamDialog(
                     onValueChange = { title = it },
                     label = { Text("Title") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("examTitleInput"),
                 )
 
                 Spacer(Modifier.height(8.dp))
@@ -99,7 +102,8 @@ fun AddExamDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = courseMenuExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor()
+                            .testTag("examCourseInput"),
                     )
                     ExposedDropdownMenu(
                         expanded = courseMenuExpanded,
@@ -132,7 +136,8 @@ fun AddExamDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeMenuExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor()
+                            .testTag("examTypeInput"),
                     )
                     ExposedDropdownMenu(
                         expanded = typeMenuExpanded,
@@ -160,7 +165,8 @@ fun AddExamDialog(
                     label = { Text("Exam date") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { showDatePicker = true },
+                        .clickable { showDatePicker = true }
+                        .testTag("examDateInput"),
                 )
             }
         },

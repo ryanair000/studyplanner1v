@@ -14,7 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -22,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -41,12 +44,15 @@ import com.example.studentcopilot.viewmodel.ExamViewModel
 @Composable
 fun ExamsScreen(
     viewModel: ExamViewModel,
+    onGoToCourses: () -> Unit = {},
 ) {
     val exams by viewModel.exams.collectAsState()
     val courses by viewModel.courses.collectAsState()
     var showDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingDeleteExamId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val pendingDeleteExam = exams.firstOrNull { it.id == pendingDeleteExamId }
 
-    if (showDialog) {
+    if (showDialog && courses.isNotEmpty()) {
         AddExamDialog(
             courses = courses,
             onDismiss = { showDialog = false },
@@ -56,11 +62,59 @@ fun ExamsScreen(
         )
     }
 
+    if (pendingDeleteExam != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteExamId = null },
+            title = { Text("Delete exam?") },
+            text = {
+                Text(
+                    "Remove ${pendingDeleteExam.title} from your exam schedule?",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteExam(pendingDeleteExam.id)
+                        pendingDeleteExamId = null
+                    },
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteExamId = null }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column {
             TopAppBar(title = { Text("Exams") })
 
-            if (exams.isEmpty()) {
+            if (courses.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            text = "Create a course before scheduling exams.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(onClick = onGoToCourses) {
+                            Text("Go To Courses")
+                        }
+                    }
+                }
+            } else if (exams.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -79,20 +133,22 @@ fun ExamsScreen(
                         ExamItem(
                             exam = exam,
                             courseName = courses.firstOrNull { it.id == exam.courseId }?.name ?: "Unknown",
-                            onDelete = { viewModel.deleteExam(exam.id) },
+                            onDelete = { pendingDeleteExamId = exam.id },
                         )
                     }
                 }
             }
         }
 
-        FloatingActionButton(
-            onClick = { showDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Add exam")
+        if (courses.isNotEmpty()) {
+            FloatingActionButton(
+                onClick = { showDialog = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add exam")
+            }
         }
     }
 }

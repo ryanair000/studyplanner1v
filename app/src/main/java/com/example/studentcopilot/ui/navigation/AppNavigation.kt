@@ -83,7 +83,18 @@ fun AppNavigation() {
             }
             composable(Screen.Exams.route) {
                 val examViewModel: ExamViewModel = viewModel()
-                ExamsScreen(viewModel = examViewModel)
+                ExamsScreen(
+                    viewModel = examViewModel,
+                    onGoToCourses = {
+                        navController.navigate(Screen.Courses.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
         }
     }

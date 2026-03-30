@@ -33,7 +33,7 @@ class ExamViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addExam(title: String, courseId: Long, date: Long, type: String) {
-        if (title.isBlank()) return
+        if (title.isBlank() || courseId <= 0L || date <= 0L || type.isBlank()) return
         viewModelScope.launch {
             examRepository.addExam(title.trim(), courseId, date, type)
         }
