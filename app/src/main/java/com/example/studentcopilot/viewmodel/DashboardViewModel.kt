@@ -26,18 +26,21 @@ data class DashboardState(
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     val state: StateFlow<DashboardState>
+    private val ownerUserId: String
 
     init {
-        val db = (application as StudentCopilotApp).database
+        val app = application as StudentCopilotApp
+        val db = app.database
         val assignmentDao = db.assignmentDao()
         val examDao = db.examDao()
+        ownerUserId = app.authRepository.currentUserIdOrNull().orEmpty()
 
         state = todayStartFlow().flatMapLatest { now ->
             combine(
-                assignmentDao.countUpcoming(now),
-                examDao.countUpcoming(now),
-                assignmentDao.nearestDeadline(now),
-                examDao.nearestDate(now),
+                assignmentDao.countUpcoming(ownerUserId, now),
+                examDao.countUpcoming(ownerUserId, now),
+                assignmentDao.nearestDeadline(ownerUserId, now),
+                examDao.nearestDate(ownerUserId, now),
             ) { assignCount, examCount, nearestAssignment, nearestExam ->
                 val nearest = listOfNotNull(nearestAssignment, nearestExam).minOrNull()
                 DashboardState(

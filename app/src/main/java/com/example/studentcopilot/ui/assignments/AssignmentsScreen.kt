@@ -47,6 +47,7 @@ fun AssignmentsScreen(
 ) {
     val assignments by viewModel.assignments.collectAsState()
     val courses by viewModel.courses.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     var showDialog by rememberSaveable { mutableStateOf(false) }
 
     if (showDialog) {
@@ -62,6 +63,13 @@ fun AssignmentsScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column {
             TopAppBar(title = { Text("Assignments") })
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage.orEmpty(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
 
             if (assignments.isEmpty()) {
                 Box(

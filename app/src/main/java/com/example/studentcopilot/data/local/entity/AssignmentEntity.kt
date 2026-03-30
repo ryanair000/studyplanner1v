@@ -15,10 +15,16 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("courseId")],
+    indices = [
+        Index("courseId"),
+        Index("ownerUserId"),
+        Index(value = ["ownerUserId", "remoteId"], unique = true),
+    ],
 )
 data class AssignmentEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val remoteId: String? = null,
+    val ownerUserId: String,
     val courseId: Long,
     val title: String,
     val dueDate: Long,

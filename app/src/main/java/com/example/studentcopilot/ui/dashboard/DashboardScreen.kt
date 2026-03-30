@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -29,6 +30,13 @@ import com.example.studentcopilot.viewmodel.DashboardViewModel
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
+    currentUserEmail: String?,
+    isGuestMode: Boolean,
+    syncErrorMessage: String?,
+    onRetrySync: () -> Unit,
+    isSyncing: Boolean,
+    onSignOut: () -> Unit,
+    isSigningOut: Boolean,
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -39,12 +47,60 @@ fun DashboardScreen(
     ) {
         TopAppBar(
             title = { Text("Pangia") },
+            actions = {
+                TextButton(
+                    onClick = onSignOut,
+                    enabled = !isSigningOut,
+                ) {
+                    Text(
+                        if (isSigningOut) {
+                            if (isGuestMode) "Leaving guest mode..." else "Signing out..."
+                        } else if (isGuestMode) {
+                            "Leave guest mode"
+                        } else {
+                            "Sign out"
+                        },
+                    )
+                }
+            },
         )
 
         Column(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (currentUserEmail != null) {
+                Text(
+                    text = "Signed in as $currentUserEmail",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (isGuestMode) {
+                Text(
+                    text = "Guest mode is on. Your data stays on this device until you sign in.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!isGuestMode && isSyncing) {
+                Text(
+                    text = "Syncing your cloud data...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else if (!isGuestMode && syncErrorMessage != null) {
+                Text(
+                    text = syncErrorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                TextButton(
+                    onClick = onRetrySync,
+                    modifier = Modifier.align(Alignment.Start),
+                ) {
+                    Text("Retry sync")
+                }
+            }
             SummaryCard(
                 title = "Upcoming Assignments",
                 value = state.upcomingAssignments.toString(),

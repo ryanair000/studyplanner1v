@@ -13,7 +13,7 @@ import com.example.studentcopilot.data.local.entity.ExamEntity
 
 @Database(
     entities = [CourseEntity::class, AssignmentEntity::class, ExamEntity::class],
-    version = 4,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,7 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "student_copilot.db",
                 )
-                    .addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_4, MIGRATION_2_4, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build()
                 INSTANCE = instance
                 instance

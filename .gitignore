@@ -1,6 +1,7 @@
 .gradle/
 local.properties
 keystore.properties
+supabase.properties
 
 # IDE files
 .idea/

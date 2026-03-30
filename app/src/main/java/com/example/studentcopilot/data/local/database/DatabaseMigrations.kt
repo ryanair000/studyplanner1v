@@ -21,6 +21,24 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        addOwnerUserIdColumns(db)
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        addRemoteIdColumns(db)
+    }
+}
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        addCourseScheduleColumns(db)
+    }
+}
+
 private fun migrateToV4(database: SupportSQLiteDatabase) {
     rebuildCoursesTable(database)
     rebuildAssignmentsTable(database)
@@ -188,4 +206,55 @@ private fun getColumnNames(database: SupportSQLiteDatabase, tableName: String): 
 
 private fun firstAvailableColumn(columns: Set<String>, candidates: List<String>): String? {
     return candidates.firstOrNull { it in columns }
+}
+
+private fun addOwnerUserIdColumns(database: SupportSQLiteDatabase) {
+    database.execSQL(
+        "ALTER TABLE `courses` ADD COLUMN `ownerUserId` TEXT NOT NULL DEFAULT ''",
+    )
+    database.execSQL(
+        "ALTER TABLE `assignments` ADD COLUMN `ownerUserId` TEXT NOT NULL DEFAULT ''",
+    )
+    database.execSQL(
+        "ALTER TABLE `exams` ADD COLUMN `ownerUserId` TEXT NOT NULL DEFAULT ''",
+    )
+    database.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_courses_ownerUserId` ON `courses` (`ownerUserId`)",
+    )
+    database.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_assignments_ownerUserId` ON `assignments` (`ownerUserId`)",
+    )
+    database.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_exams_ownerUserId` ON `exams` (`ownerUserId`)",
+    )
+}
+
+private fun addRemoteIdColumns(database: SupportSQLiteDatabase) {
+    database.execSQL(
+        "ALTER TABLE `courses` ADD COLUMN `remoteId` TEXT",
+    )
+    database.execSQL(
+        "ALTER TABLE `assignments` ADD COLUMN `remoteId` TEXT",
+    )
+    database.execSQL(
+        "ALTER TABLE `exams` ADD COLUMN `remoteId` TEXT",
+    )
+    database.execSQL(
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_courses_ownerUserId_remoteId` ON `courses` (`ownerUserId`, `remoteId`)",
+    )
+    database.execSQL(
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_assignments_ownerUserId_remoteId` ON `assignments` (`ownerUserId`, `remoteId`)",
+    )
+    database.execSQL(
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_exams_ownerUserId_remoteId` ON `exams` (`ownerUserId`, `remoteId`)",
+    )
+}
+
+private fun addCourseScheduleColumns(database: SupportSQLiteDatabase) {
+    database.execSQL(
+        "ALTER TABLE `courses` ADD COLUMN `classDayOfWeek` INTEGER",
+    )
+    database.execSQL(
+        "ALTER TABLE `courses` ADD COLUMN `classStartMinuteOfDay` INTEGER",
+    )
 }

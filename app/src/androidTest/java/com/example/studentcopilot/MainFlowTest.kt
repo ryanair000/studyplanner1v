@@ -22,6 +22,8 @@ import org.junit.Test
 
 class MainFlowTest {
 
+    private val ownerUserId = "test-user"
+
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
@@ -29,9 +31,24 @@ class MainFlowTest {
         get() = composeTestRule.activity.application as StudentCopilotApp
 
     @Before
-    fun clearDatabase() {
+    fun clearDatabaseAndSeedSession() {
         runBlocking(Dispatchers.IO) {
             app.database.clearAllTables()
+        }
+        app.getSharedPreferences("auth_session", 0)
+            .edit()
+            .putString("user_id", ownerUserId)
+            .putString("email", "tester@pangia.app")
+            .putString("access_token", "debug-token")
+            .remove("refresh_token")
+            .remove("expires_at")
+            .apply()
+
+        composeTestRule.activity.runOnUiThread {
+            composeTestRule.activity.recreate()
+        }
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithText("Courses").fetchSemanticsNodes().isNotEmpty()
         }
     }
 
@@ -51,13 +68,14 @@ class MainFlowTest {
         composeTestRule.onNodeWithText(courseName).assertIsDisplayed()
 
         val courseId = runBlocking(Dispatchers.IO) {
-            app.database.courseDao().getAll().first().first { it.name == courseName }.id
+            app.database.courseDao().getAll(ownerUserId).first().first { it.name == courseName }.id
         }
         val dueDate = currentLocalDayStartMillis() + TimeUnit.DAYS.toMillis(3)
 
         runBlocking(Dispatchers.IO) {
             app.database.assignmentDao().insert(
                 AssignmentEntity(
+                    ownerUserId = ownerUserId,
                     courseId = courseId,
                     title = assignmentTitle,
                     dueDate = dueDate,
@@ -65,6 +83,7 @@ class MainFlowTest {
             )
             app.database.examDao().insert(
                 ExamEntity(
+                    ownerUserId = ownerUserId,
                     courseId = courseId,
                     title = examTitle,
                     date = dueDate,
@@ -95,8 +114,8 @@ class MainFlowTest {
         }
 
         val (assignmentCount, examCount) = runBlocking(Dispatchers.IO) {
-            val assignments = app.database.assignmentDao().getAll().first()
-            val exams = app.database.examDao().getAll().first()
+            val assignments = app.database.assignmentDao().getAll(ownerUserId).first()
+            val exams = app.database.examDao().getAll(ownerUserId).first()
             assignments.size to exams.size
         }
 

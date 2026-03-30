@@ -6,8 +6,20 @@ val keystorePropertiesFile = rootProject.file("keystore.properties")
 if (keystorePropertiesFile.exists()) {
     FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
 }
+val supabaseProperties = Properties()
+val supabasePropertiesFile = rootProject.file("supabase.properties")
+if (supabasePropertiesFile.exists()) {
+    FileInputStream(supabasePropertiesFile).use(supabaseProperties::load)
+}
 val releaseSigningReady = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
     .all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+
+fun buildConfigString(value: String?): String {
+    val escaped = value.orEmpty()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+    return "\"$escaped\""
+}
 
 plugins {
     id("com.android.application")
@@ -20,14 +32,23 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.studentcopilot"
+        val appId = "com.example.studentcopilot"
+        applicationId = appId
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.0.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_URL", buildConfigString(supabaseProperties.getProperty("url")))
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString(supabaseProperties.getProperty("publishableKey")))
+        buildConfigField("String", "AUTH_REDIRECT_SCHEME", buildConfigString(appId))
+        buildConfigField("String", "AUTH_REDIRECT_HOST", "\"auth\"")
+        buildConfigField("String", "AUTH_REDIRECT_PATH", "\"/callback\"")
         buildConfigField("String", "UPDATE_CONFIG_URL", "\"\"")
         buildConfigField("String", "UPDATE_FALLBACK_DOWNLOAD_URL", "\"\"")
+        manifestPlaceholders["authRedirectScheme"] = appId
+        manifestPlaceholders["authRedirectHost"] = "auth"
+        manifestPlaceholders["authRedirectPath"] = "/callback"
     }
 
     buildFeatures {
@@ -109,6 +130,7 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Debug tooling
     debugImplementation("androidx.compose.ui:ui-tooling")
