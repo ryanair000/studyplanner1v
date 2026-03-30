@@ -1,0 +1,30 @@
+.gradle/
+local.properties
+keystore.properties
+
+# IDE files
+.idea/
+*.iml
+
+# Build outputs
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Packaged artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.jks
+*.keystore
+
+# Logs and crash dumps
+*.log
+*.hprof
+
+# Local agent scratch space
+.codex-temp/
