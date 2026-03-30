@@ -4,16 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.example.studentcopilot.BuildConfig
 import com.example.studentcopilot.data.local.database.AppDatabase
-import com.example.studentcopilot.util.OAuthCallbackParser
 import java.io.InputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
 import java.net.SocketTimeoutException
-import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.net.URL
-import java.nio.charset.StandardCharsets
 import javax.net.ssl.SSLException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,25 +48,6 @@ class AuthRepository(
 
     fun isConfigured(): Boolean {
         return BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
-    }
-
-    fun googleSignInUrl(): String? {
-        if (!isConfigured()) return null
-
-        val redirectTo = URLEncoder.encode(googleRedirectUrl(), StandardCharsets.UTF_8.name())
-        val scopes = URLEncoder.encode("openid email profile", StandardCharsets.UTF_8.name())
-        return buildString {
-            append(BuildConfig.SUPABASE_URL.trimEnd('/'))
-            append("/auth/v1/authorize?provider=google")
-            append("&redirect_to=")
-            append(redirectTo)
-            append("&scopes=")
-            append(scopes)
-        }
-    }
-
-    fun googleRedirectUrl(): String {
-        return "${BuildConfig.AUTH_REDIRECT_SCHEME}://${BuildConfig.AUTH_REDIRECT_HOST}${BuildConfig.AUTH_REDIRECT_PATH}"
     }
 
     fun currentSessionOrNull(): AuthSession? {
@@ -208,41 +186,6 @@ class AuthRepository(
         return@withContext AuthActionResult.RequiresEmailConfirmation(email)
     }
 
-    suspend fun completeGoogleSignIn(callbackUrl: String): AuthActionResult = withContext(Dispatchers.IO) {
-        if (!isConfigured()) {
-            return@withContext AuthActionResult.Failure("Supabase is not configured.")
-        }
-
-        val callbackPayload = OAuthCallbackParser.parse(callbackUrl)
-        callbackPayload.errorMessage?.let { errorMessage ->
-            clearSession()
-            return@withContext AuthActionResult.Failure(errorMessage)
-        }
-
-        val accessToken = callbackPayload.accessToken
-            ?: return@withContext AuthActionResult.Failure("Google sign-in did not return a session.")
-
-        val user = runCatching {
-            fetchCurrentUser(accessToken)
-        }.getOrElse { throwable ->
-            return@withContext AuthActionResult.Failure(throwable.toAuthFailureMessage())
-        } ?: return@withContext AuthActionResult.Failure(
-            "Google sign-in succeeded, but Pangia could not load your account details.",
-        )
-
-        val session = AuthSession(
-            userId = user.id,
-            email = user.email,
-            accessToken = accessToken,
-            refreshToken = callbackPayload.refreshToken,
-            expiresAtEpochSeconds = callbackPayload.expiresAtEpochSeconds,
-        )
-
-        persistSession(session, isGuest = false)
-        claimLocalDataIfNeeded(session.userId)
-        AuthActionResult.Authenticated(session)
-    }
-
     suspend fun signOut() = withContext(Dispatchers.IO) {
         val session = currentSessionOrNull()
         val accessToken = session?.accessToken
@@ -270,24 +213,6 @@ class AuthRepository(
         if (!response.isSuccessful) return null
 
         return parseSession(response.body)?.also { persistSession(it, isGuest = false) }
-    }
-
-    private suspend fun fetchCurrentUser(accessToken: String): AuthUser? {
-        val response = request(
-            endpoint = "auth/v1/user",
-            method = "GET",
-            body = null,
-            accessToken = accessToken,
-        )
-        if (!response.isSuccessful) return null
-
-        val root = runCatching { json.parseToJsonElement(response.body).jsonObject }.getOrNull() ?: return null
-        val userId = root["id"]?.jsonPrimitive?.contentOrNull ?: return null
-        val email = root["email"]?.jsonPrimitive?.contentOrNull
-        return AuthUser(
-            id = userId,
-            email = email,
-        )
     }
 
     private suspend fun claimLocalDataIfNeeded(ownerUserId: String) {
@@ -434,11 +359,6 @@ class AuthRepository(
         val isSuccessful: Boolean
             get() = statusCode in 200..299
     }
-
-    private data class AuthUser(
-        val id: String,
-        val email: String?,
-    )
 
     private companion object {
         const val PREFS_NAME = "auth_session"

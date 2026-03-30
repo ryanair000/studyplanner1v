@@ -6,7 +6,6 @@ Pangia now uses Supabase for authentication and cloud sync, with Room as the on-
 
 - Email/password sign up
 - Email/password sign in
-- Google sign in through Supabase OAuth
 - Guest mode with local-only data
 - Session restore on app launch
 - Sign out
@@ -41,21 +40,9 @@ Do not put a Supabase `service_role` key into the Android app. If a service-role
 ## Supabase Dashboard Settings
 
 - Authentication provider: Email
-- Authentication provider: Google
 - Confirm email: optional, depending on whether you want verification before first sign-in
-- Redirect URL allow list: `com.example.studentcopilot://auth/callback`
 
 If email confirmation is enabled, Pangia will show a confirmation message after sign-up and wait for the user to verify before signing in.
-
-For Google sign-in specifically:
-
-1. Open `Authentication > Sign In / Providers > Google` in Supabase.
-2. Enable Google.
-3. Paste the Google OAuth client ID and client secret there.
-4. Save the provider.
-5. Add `com.example.studentcopilot://auth/callback` to the Auth redirect URL allow list.
-
-Pangia uses the browser-based Supabase OAuth flow on Android and returns to the app through that redirect URL.
 
 ## Build Verification
 

@@ -1,7 +1,6 @@
 package com.example.studentcopilot.viewmodel
 
 import android.app.Application
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.studentcopilot.StudentCopilotApp
@@ -186,21 +185,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun beginGoogleSignIn(): String? {
-        if (!authRepository.isConfigured()) {
-            _state.update { it.copy(errorMessage = "Supabase auth is not configured on this build.") }
-            return null
-        }
-
-        _state.update {
-            it.copy(
-                errorMessage = null,
-                infoMessage = null,
-            )
-        }
-        return authRepository.googleSignInUrl()
-    }
-
     fun continueAsGuest() {
         viewModelScope.launch {
             _state.update {
@@ -220,48 +204,6 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 currentUserId = guestSession.userId,
                 infoMessage = "Guest mode keeps your data on this device only.",
             )
-        }
-    }
-
-    fun completeGoogleSignIn(callbackUri: Uri) {
-        viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    isSubmitting = true,
-                    errorMessage = null,
-                    infoMessage = null,
-                )
-            }
-
-            when (val result = authRepository.completeGoogleSignIn(callbackUri.toString())) {
-                is AuthActionResult.Authenticated -> {
-                    _state.value = AuthUiState(
-                        isConfigured = true,
-                        isLoading = false,
-                        isSyncing = true,
-                        isAuthenticated = true,
-                        currentUserId = result.session.userId,
-                        currentUserEmail = result.session.email,
-                    )
-                    finishSync()
-                }
-                is AuthActionResult.Failure -> {
-                    _state.update {
-                        it.copy(
-                            isSubmitting = false,
-                            errorMessage = result.message,
-                        )
-                    }
-                }
-                is AuthActionResult.RequiresEmailConfirmation -> {
-                    _state.update {
-                        it.copy(
-                            isSubmitting = false,
-                            infoMessage = "Check your email to finish signing in.",
-                        )
-                    }
-                }
-            }
         }
     }
 

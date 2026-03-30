@@ -36,19 +36,13 @@ android {
         applicationId = appId
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.0.3"
+        versionCode = 5
+        versionName = "1.0.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "SUPABASE_URL", buildConfigString(supabaseProperties.getProperty("url")))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", buildConfigString(supabaseProperties.getProperty("publishableKey")))
-        buildConfigField("String", "AUTH_REDIRECT_SCHEME", buildConfigString(appId))
-        buildConfigField("String", "AUTH_REDIRECT_HOST", "\"auth\"")
-        buildConfigField("String", "AUTH_REDIRECT_PATH", "\"/callback\"")
         buildConfigField("String", "UPDATE_CONFIG_URL", "\"\"")
         buildConfigField("String", "UPDATE_FALLBACK_DOWNLOAD_URL", "\"\"")
-        manifestPlaceholders["authRedirectScheme"] = appId
-        manifestPlaceholders["authRedirectHost"] = "auth"
-        manifestPlaceholders["authRedirectPath"] = "/callback"
     }
 
     buildFeatures {

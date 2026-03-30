@@ -34,7 +34,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.studentcopilot.MainActivity
 import com.example.studentcopilot.ui.auth.AuthScreen
 import com.example.studentcopilot.ui.assignments.AssignmentsScreen
 import com.example.studentcopilot.ui.courses.CoursesScreen
@@ -50,11 +49,8 @@ import com.example.studentcopilot.viewmodel.ExamViewModel
 @Composable
 fun AppNavigation() {
     val context = LocalContext.current
-    val activity = context as? MainActivity
     val authViewModel: AuthViewModel = viewModel()
     val authState by authViewModel.state.collectAsState()
-    val authCallbackUri by activity?.authCallbackUris?.collectAsState(initial = null)
-        ?: remember { mutableStateOf(null) }
     val appUpdateViewModel: AppUpdateViewModel = viewModel()
     val updateState by appUpdateViewModel.state.collectAsState()
     val availableUpdate = updateState.availableUpdate
@@ -78,12 +74,6 @@ fun AppNavigation() {
         }
     }
 
-    LaunchedEffect(authCallbackUri) {
-        val callbackUri = authCallbackUri ?: return@LaunchedEffect
-        authViewModel.completeGoogleSignIn(callbackUri)
-        activity?.clearAuthCallback()
-    }
-
     if (authState.isLoading || (authState.canEnterApp && !authState.isGuestMode && authState.isSyncing)) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -99,11 +89,6 @@ fun AppNavigation() {
             state = authState,
             onSignIn = authViewModel::signIn,
             onSignUp = authViewModel::signUp,
-            onSignInWithGoogle = {
-                authViewModel.beginGoogleSignIn()?.let { googleSignInUrl ->
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(googleSignInUrl)))
-                }
-            },
             onContinueAsGuest = authViewModel::continueAsGuest,
             onClearMessages = authViewModel::clearMessages,
         )
