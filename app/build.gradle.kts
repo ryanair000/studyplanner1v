@@ -26,10 +26,13 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "UPDATE_CONFIG_URL", "\"\"")
+        buildConfigField("String", "UPDATE_FALLBACK_DOWNLOAD_URL", "\"\"")
     }
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -105,6 +108,7 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
     // Debug tooling
     debugImplementation("androidx.compose.ui:ui-tooling")
