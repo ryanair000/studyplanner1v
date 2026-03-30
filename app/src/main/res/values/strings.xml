@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Pangia</string>
+    <string name="pangia_logo_content_description">Pangia logo</string>
+    <string name="pangia_icon_content_description">Pangia app icon</string>
 </resources>

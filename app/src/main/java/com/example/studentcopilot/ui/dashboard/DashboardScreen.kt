@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.studentcopilot.ui.components.PangiaLogoLockup
 import com.example.studentcopilot.util.formatLocalDateMillis
 import com.example.studentcopilot.viewmodel.DashboardViewModel
 
@@ -46,7 +47,14 @@ fun DashboardScreen(
             .verticalScroll(rememberScrollState()),
     ) {
         TopAppBar(
-            title = { Text("Pangia") },
+            title = {
+                PangiaLogoLockup(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(30.dp)
+                        .padding(end = 12.dp)
+                )
+            },
             actions = {
                 TextButton(
                     onClick = onSignOut,

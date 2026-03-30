@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.studentcopilot.ui.components.PangiaLogoLockup
 import com.example.studentcopilot.util.localDateMillisToDatePickerSelectionMillis
 import com.example.studentcopilot.util.selectedDateMillisToLocalStartOfDay
 import com.example.studentcopilot.viewmodel.CalendarAgendaItem
@@ -184,8 +185,6 @@ private fun CalendarHeader(
     onJumpToToday: () -> Unit,
 ) {
     val userLabel = if (isGuestMode) "Guest" else currentUserEmail?.substringBefore("@").orEmpty().ifBlank { "Student" }
-    val avatarLabel = userLabel.firstOrNull()?.uppercase() ?: "P"
-    val statusColor = if (isGuestMode) Color(0xFFFFB74D) else Color(0xFF38C172)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -196,46 +195,9 @@ private fun CalendarHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(CalendarSurface)
-                        .border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = avatarLabel,
-                        color = CalendarPrimary,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(statusColor)
-                        .border(2.dp, CalendarSurface, CircleShape),
-                )
-            }
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "Pangia",
-                        color = CalendarPrimary,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                    Text(
-                        text = " Elite",
-                        color = CalendarMuted,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Light,
-                    )
-                }
+                PangiaLogoLockup(modifier = Modifier.height(34.dp))
+                Spacer(Modifier.height(6.dp))
                 Text(
                     text = if (isGuestMode) "Calendar preview" else "$userLabel's academic flow",
                     color = CalendarMuted,
