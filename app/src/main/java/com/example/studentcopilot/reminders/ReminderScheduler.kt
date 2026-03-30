@@ -52,6 +52,7 @@ class ReminderScheduler(
 
         val now = System.currentTimeMillis()
         val courses = database.courseDao().getAllSnapshot(ownerUserId)
+        val timetableEntries = database.timetableEntryDao().getAllSnapshot(ownerUserId)
         val assignments = database.assignmentDao().getAllSnapshot(ownerUserId)
         val exams = database.examDao().getAllSnapshot(ownerUserId)
         val courseNamesById = courses.associateBy({ it.id }, { it.name })
@@ -98,16 +99,15 @@ class ReminderScheduler(
             )
         }
 
-        courses.forEach { course ->
-            val classDay = course.classDayOfWeek ?: return@forEach
-            val classStartMinute = course.classStartMinuteOfDay ?: return@forEach
+        timetableEntries.forEach { entry ->
+            val courseName = courseNamesById[entry.courseId] ?: return@forEach
             val triggerAt = ReminderTimeCalculator.nextClassReminderAt(
-                classDayOfWeek = classDay,
-                classStartMinuteOfDay = classStartMinute,
+                classDayOfWeek = entry.dayOfWeek,
+                classStartMinuteOfDay = entry.startMinuteOfDay,
                 nowMillis = now,
             )
             val initialDelay = (triggerAt - now).coerceAtLeast(0L)
-            val workName = classWorkName(ownerUserId, course.id)
+            val workName = classWorkName(ownerUserId, entry.id)
             workManager.enqueueUniquePeriodicWork(
                 workName,
                 ExistingPeriodicWorkPolicy.UPDATE,
@@ -116,7 +116,7 @@ class ReminderScheduler(
                     .setInputData(
                         reminderData(
                             title = "Class starting soon",
-                            message = "${course.name} starts at ${minuteOfDayLabel(classStartMinute)}.",
+                            message = "$courseName starts at ${minuteOfDayLabel(entry.startMinuteOfDay)}.",
                             notificationId = workName.hashCode(),
                         ),
                     )
@@ -182,8 +182,8 @@ class ReminderScheduler(
     private fun examWorkName(ownerUserId: String, examId: Long) =
         "pangia-exam-reminder-$ownerUserId-$examId"
 
-    private fun classWorkName(ownerUserId: String, courseId: Long) =
-        "pangia-class-reminder-$ownerUserId-$courseId"
+    private fun classWorkName(ownerUserId: String, timetableEntryId: Long) =
+        "pangia-class-reminder-$ownerUserId-$timetableEntryId"
 
     companion object {
         const val CHANNEL_ID = "pangia_reminders"

@@ -223,11 +223,13 @@ class AuthRepository(
             database.courseDao().reassignOwner(GUEST_USER_ID, ownerUserId)
             database.assignmentDao().reassignOwner(GUEST_USER_ID, ownerUserId)
             database.examDao().reassignOwner(GUEST_USER_ID, ownerUserId)
+            database.timetableEntryDao().reassignOwner(GUEST_USER_ID, ownerUserId)
         }
 
         database.courseDao().claimLegacyRows(ownerUserId)
         database.assignmentDao().claimLegacyRows(ownerUserId)
         database.examDao().claimLegacyRows(ownerUserId)
+        database.timetableEntryDao().claimLegacyRows(ownerUserId)
     }
 
     private fun persistSession(session: AuthSession, isGuest: Boolean) {

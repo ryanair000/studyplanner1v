@@ -6,6 +6,7 @@ import com.example.studentcopilot.data.local.database.AppDatabase
 import com.example.studentcopilot.data.local.entity.AssignmentEntity
 import com.example.studentcopilot.data.local.entity.CourseEntity
 import com.example.studentcopilot.data.local.entity.ExamEntity
+import com.example.studentcopilot.data.local.entity.TimetableEntryEntity
 import com.example.studentcopilot.reminders.ReminderScheduler
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -15,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,15 +51,18 @@ class SupabaseSyncRepository(
             }
 
             uploadPendingCourses(session)
+            uploadPendingTimetableEntries(session)
             uploadPendingAssignments(session)
             uploadPendingExams(session)
 
             val remoteCourses = fetchCourses(session)
+            val remoteTimetableEntries = fetchTimetableEntries(session)
             val remoteAssignments = fetchAssignments(session)
             val remoteExams = fetchExams(session)
             replaceLocalSnapshot(
                 ownerUserId = session.userId,
                 remoteCourses = remoteCourses,
+                remoteTimetableEntries = remoteTimetableEntries,
                 remoteAssignments = remoteAssignments,
                 remoteExams = remoteExams,
             )
@@ -90,7 +93,7 @@ class SupabaseSyncRepository(
             }.getOrNull()
         }
 
-        database.courseDao().insert(
+        val localCourseId = database.courseDao().insert(
             CourseEntity(
                 remoteId = remoteCourse?.id,
                 ownerUserId = ownerUserId,
@@ -98,6 +101,14 @@ class SupabaseSyncRepository(
                 classDayOfWeek = classDayOfWeek,
                 classStartMinuteOfDay = classStartMinuteOfDay,
             ),
+        )
+        upsertGeneratedCourseScheduleEntry(
+            ownerUserId = ownerUserId,
+            localCourseId = localCourseId,
+            remoteCourseId = remoteCourse?.id,
+            classDayOfWeek = classDayOfWeek,
+            classStartMinuteOfDay = classStartMinuteOfDay,
+            session = session,
         )
         reminderScheduler.rescheduleAll(ownerUserId)
     }
@@ -113,23 +124,25 @@ class SupabaseSyncRepository(
             ?: throw SyncFailureException("Couldn't find that course.")
         val trimmedName = name.trim()
 
-        existingCourse.remoteId?.takeIf { it.isNotBlank() }?.let { remoteId ->
-            val session = currentCloudSessionOrNull()
+        val session = existingCourse.remoteId?.takeIf { it.isNotBlank() }?.let { remoteId ->
+            currentCloudSessionOrNull()
+                ?.also {
+                    patchRemoteRow(
+                        table = "courses",
+                        filters = listOf(
+                            "id=eq.${encodeValue(remoteId)}",
+                            "owner_user_id=eq.${encodeValue(ownerUserId)}",
+                        ),
+                        accessToken = it.accessToken,
+                        body = buildCoursePayload(
+                            ownerUserId = ownerUserId,
+                            name = trimmedName,
+                            classDayOfWeek = classDayOfWeek,
+                            classStartMinuteOfDay = classStartMinuteOfDay,
+                        ),
+                    )
+                }
                 ?: throw SyncFailureException("Sign in again before updating synced courses.")
-            patchRemoteRow(
-                table = "courses",
-                filters = listOf(
-                    "id=eq.${encodeValue(remoteId)}",
-                    "owner_user_id=eq.${encodeValue(ownerUserId)}",
-                ),
-                accessToken = session.accessToken,
-                body = buildCoursePayload(
-                    ownerUserId = ownerUserId,
-                    name = trimmedName,
-                    classDayOfWeek = classDayOfWeek,
-                    classStartMinuteOfDay = classStartMinuteOfDay,
-                ),
-            )
         }
 
         database.courseDao().update(
@@ -138,6 +151,14 @@ class SupabaseSyncRepository(
                 classDayOfWeek = classDayOfWeek,
                 classStartMinuteOfDay = classStartMinuteOfDay,
             ),
+        )
+        upsertGeneratedCourseScheduleEntry(
+            ownerUserId = ownerUserId,
+            localCourseId = localId,
+            remoteCourseId = existingCourse.remoteId,
+            classDayOfWeek = classDayOfWeek,
+            classStartMinuteOfDay = classStartMinuteOfDay,
+            session = session,
         )
         reminderScheduler.rescheduleAll(ownerUserId)
     }
@@ -321,6 +342,30 @@ class SupabaseSyncRepository(
         }
     }
 
+    private suspend fun uploadPendingTimetableEntries(session: AuthSession) {
+        val entries = database.timetableEntryDao().getAllSnapshot(session.userId)
+        entries.filter { it.remoteId.isNullOrBlank() }.forEach { entry ->
+            val localCourse = database.courseDao().getById(session.userId, entry.courseId)
+                ?: return@forEach
+            val remoteCourseId = ensureRemoteCourseId(localCourse, session) ?: return@forEach
+            val remoteEntry = insertRemoteTimetableEntry(
+                session = session,
+                ownerUserId = session.userId,
+                remoteCourseId = remoteCourseId,
+                dayOfWeek = entry.dayOfWeek,
+                startMinuteOfDay = entry.startMinuteOfDay,
+                endMinuteOfDay = entry.endMinuteOfDay,
+                classType = entry.classType,
+                section = entry.section,
+                venue = entry.venue,
+                lecturer = entry.lecturer,
+                weekPattern = entry.weekPattern,
+                source = entry.source,
+            )
+            database.timetableEntryDao().updateRemoteId(session.userId, entry.id, remoteEntry.id)
+        }
+    }
+
     private suspend fun uploadPendingAssignments(session: AuthSession) {
         val assignments = database.assignmentDao().getAllSnapshot(session.userId)
         assignments.filter { it.remoteId.isNullOrBlank() }.forEach { assignment ->
@@ -370,13 +415,122 @@ class SupabaseSyncRepository(
         return remoteCourse.id
     }
 
+    private suspend fun upsertGeneratedCourseScheduleEntry(
+        ownerUserId: String,
+        localCourseId: Long,
+        remoteCourseId: String?,
+        classDayOfWeek: Int?,
+        classStartMinuteOfDay: Int?,
+        session: AuthSession?,
+    ) {
+        val dao = database.timetableEntryDao()
+        val existingEntry = dao.getGeneratedForCourse(ownerUserId, localCourseId)
+
+        if (classDayOfWeek == null || classStartMinuteOfDay == null) {
+            existingEntry?.let { entry ->
+                entry.remoteId?.takeIf { it.isNotBlank() }?.let { remoteId ->
+                    val activeSession = session
+                        ?: throw SyncFailureException("Sign in again before updating synced timetable reminders.")
+                    deleteRemoteRow(
+                        table = "timetable_entries",
+                        filters = listOf(
+                            "id=eq.${encodeValue(remoteId)}",
+                            "owner_user_id=eq.${encodeValue(ownerUserId)}",
+                        ),
+                        accessToken = activeSession.accessToken,
+                    )
+                }
+                dao.deleteById(ownerUserId, entry.id)
+            }
+            return
+        }
+
+        val resolvedRemoteId = if (remoteCourseId.isNullOrBlank() || session == null) {
+            existingEntry?.remoteId
+        } else {
+            val syncedRemoteCourseId = remoteCourseId
+            val activeSession = session
+            if (existingEntry?.remoteId?.isNotBlank() == true) {
+                patchRemoteRow(
+                    table = "timetable_entries",
+                    filters = listOf(
+                        "id=eq.${encodeValue(existingEntry.remoteId)}",
+                        "owner_user_id=eq.${encodeValue(ownerUserId)}",
+                    ),
+                    accessToken = activeSession.accessToken,
+                    body = buildTimetableEntryPayload(
+                        ownerUserId = ownerUserId,
+                        remoteCourseId = syncedRemoteCourseId,
+                        dayOfWeek = classDayOfWeek,
+                        startMinuteOfDay = classStartMinuteOfDay,
+                        endMinuteOfDay = null,
+                        classType = null,
+                        section = null,
+                        venue = null,
+                        lecturer = null,
+                        weekPattern = null,
+                        source = TimetableEntryEntity.SOURCE_COURSE_SCHEDULE,
+                    ),
+                )
+                existingEntry.remoteId
+            } else {
+                runCatching {
+                    insertRemoteTimetableEntry(
+                        session = activeSession,
+                        ownerUserId = ownerUserId,
+                        remoteCourseId = syncedRemoteCourseId,
+                        dayOfWeek = classDayOfWeek,
+                        startMinuteOfDay = classStartMinuteOfDay,
+                        endMinuteOfDay = null,
+                        classType = null,
+                        section = null,
+                        venue = null,
+                        lecturer = null,
+                        weekPattern = null,
+                        source = TimetableEntryEntity.SOURCE_COURSE_SCHEDULE,
+                    ).id
+                }.getOrNull()
+            }
+        }
+
+        if (existingEntry != null) {
+            dao.update(
+                existingEntry.copy(
+                    remoteId = resolvedRemoteId ?: existingEntry.remoteId,
+                    dayOfWeek = classDayOfWeek,
+                    startMinuteOfDay = classStartMinuteOfDay,
+                    endMinuteOfDay = null,
+                    classType = null,
+                    section = null,
+                    venue = null,
+                    lecturer = null,
+                    weekPattern = null,
+                    source = TimetableEntryEntity.SOURCE_COURSE_SCHEDULE,
+                ),
+            )
+        } else {
+            dao.insert(
+                TimetableEntryEntity(
+                    remoteId = resolvedRemoteId,
+                    ownerUserId = ownerUserId,
+                    courseId = localCourseId,
+                    dayOfWeek = classDayOfWeek,
+                    startMinuteOfDay = classStartMinuteOfDay,
+                    source = TimetableEntryEntity.SOURCE_COURSE_SCHEDULE,
+                ),
+            )
+        }
+    }
+
     private suspend fun replaceLocalSnapshot(
         ownerUserId: String,
         remoteCourses: List<RemoteCourse>,
+        remoteTimetableEntries: List<RemoteTimetableEntry>,
         remoteAssignments: List<RemoteAssignment>,
         remoteExams: List<RemoteExam>,
     ) {
         database.withTransaction {
+            database.timetableEntryDao().deleteAllByOwner(ownerUserId)
             database.assignmentDao().deleteAllByOwner(ownerUserId)
             database.examDao().deleteAllByOwner(ownerUserId)
             database.courseDao().deleteAllByOwner(ownerUserId)
@@ -393,6 +547,44 @@ class SupabaseSyncRepository(
                     ),
                 )
                 remoteCourseToLocalId[course.id] = localId
+            }
+
+            val coursesWithRemoteEntries = mutableSetOf<String>()
+            remoteTimetableEntries.forEach { entry ->
+                val localCourseId = remoteCourseToLocalId[entry.courseId] ?: return@forEach
+                database.timetableEntryDao().insert(
+                    TimetableEntryEntity(
+                        remoteId = entry.id,
+                        ownerUserId = ownerUserId,
+                        courseId = localCourseId,
+                        dayOfWeek = entry.dayOfWeek,
+                        startMinuteOfDay = entry.startMinuteOfDay,
+                        endMinuteOfDay = entry.endMinuteOfDay,
+                        classType = entry.classType,
+                        section = entry.section,
+                        venue = entry.venue,
+                        lecturer = entry.lecturer,
+                        weekPattern = entry.weekPattern,
+                        source = entry.source,
+                    ),
+                )
+                coursesWithRemoteEntries += entry.courseId
+            }
+
+            remoteCourses.forEach { course ->
+                val localCourseId = remoteCourseToLocalId[course.id] ?: return@forEach
+                if (course.id in coursesWithRemoteEntries) return@forEach
+                val classDay = course.classDayOfWeek ?: return@forEach
+                val classStartMinute = course.classStartMinuteOfDay ?: return@forEach
+                database.timetableEntryDao().insert(
+                    TimetableEntryEntity(
+                        ownerUserId = ownerUserId,
+                        courseId = localCourseId,
+                        dayOfWeek = classDay,
+                        startMinuteOfDay = classStartMinute,
+                        source = TimetableEntryEntity.SOURCE_COURSE_SCHEDULE,
+                    ),
+                )
             }
 
             remoteAssignments.forEach { assignment ->
@@ -432,6 +624,15 @@ class SupabaseSyncRepository(
             accessToken = session.accessToken,
         )
         return parseJsonArray(response.body).mapNotNull { parseRemoteCourse(it.jsonObject) }
+    }
+
+    private suspend fun fetchTimetableEntries(session: AuthSession): List<RemoteTimetableEntry> {
+        val response = request(
+            method = "GET",
+            endpoint = "rest/v1/timetable_entries?select=id,owner_user_id,course_id,day_of_week,start_minute_of_day,end_minute_of_day,class_type,section,venue,lecturer,week_pattern,source&owner_user_id=eq.${encodeValue(session.userId)}&order=day_of_week.asc,start_minute_of_day.asc",
+            accessToken = session.accessToken,
+        )
+        return parseJsonArray(response.body).mapNotNull { parseRemoteTimetableEntry(it.jsonObject) }
     }
 
     private suspend fun fetchAssignments(session: AuthSession): List<RemoteAssignment> {
@@ -485,6 +686,69 @@ class SupabaseSyncRepository(
         put("name", name)
         put("class_day_of_week", classDayOfWeek?.let(::JsonPrimitive) ?: JsonNull)
         put("class_start_minute_of_day", classStartMinuteOfDay?.let(::JsonPrimitive) ?: JsonNull)
+    }
+
+    private suspend fun insertRemoteTimetableEntry(
+        session: AuthSession,
+        ownerUserId: String,
+        remoteCourseId: String,
+        dayOfWeek: Int,
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int?,
+        classType: String?,
+        section: String?,
+        venue: String?,
+        lecturer: String?,
+        weekPattern: String?,
+        source: String,
+    ): RemoteTimetableEntry {
+        val response = request(
+            method = "POST",
+            endpoint = "rest/v1/timetable_entries?select=id,owner_user_id,course_id,day_of_week,start_minute_of_day,end_minute_of_day,class_type,section,venue,lecturer,week_pattern,source",
+            accessToken = session.accessToken,
+            body = buildTimetableEntryPayload(
+                ownerUserId = ownerUserId,
+                remoteCourseId = remoteCourseId,
+                dayOfWeek = dayOfWeek,
+                startMinuteOfDay = startMinuteOfDay,
+                endMinuteOfDay = endMinuteOfDay,
+                classType = classType,
+                section = section,
+                venue = venue,
+                lecturer = lecturer,
+                weekPattern = weekPattern,
+                source = source,
+            ),
+            prefer = "return=representation",
+        )
+        return parseSingleObject(response.body)?.let(::parseRemoteTimetableEntry)
+            ?: throw SyncFailureException("Supabase returned an invalid timetable entry response.")
+    }
+
+    private fun buildTimetableEntryPayload(
+        ownerUserId: String,
+        remoteCourseId: String,
+        dayOfWeek: Int,
+        startMinuteOfDay: Int,
+        endMinuteOfDay: Int?,
+        classType: String?,
+        section: String?,
+        venue: String?,
+        lecturer: String?,
+        weekPattern: String?,
+        source: String,
+    ) = buildJsonObject {
+        put("owner_user_id", ownerUserId)
+        put("course_id", remoteCourseId)
+        put("day_of_week", dayOfWeek)
+        put("start_minute_of_day", startMinuteOfDay)
+        put("end_minute_of_day", endMinuteOfDay?.let(::JsonPrimitive) ?: JsonNull)
+        put("class_type", classType?.takeIf { it.isNotBlank() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("section", section?.takeIf { it.isNotBlank() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("venue", venue?.takeIf { it.isNotBlank() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("lecturer", lecturer?.takeIf { it.isNotBlank() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("week_pattern", weekPattern?.takeIf { it.isNotBlank() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("source", source)
     }
 
     private suspend fun insertRemoteAssignment(
@@ -634,6 +898,23 @@ class SupabaseSyncRepository(
         )
     }
 
+    private fun parseRemoteTimetableEntry(element: JsonObject): RemoteTimetableEntry? {
+        return RemoteTimetableEntry(
+            id = element.stringValue("id") ?: return null,
+            ownerUserId = element.stringValue("owner_user_id") ?: return null,
+            courseId = element.stringValue("course_id") ?: return null,
+            dayOfWeek = element.intValue("day_of_week") ?: return null,
+            startMinuteOfDay = element.intValue("start_minute_of_day") ?: return null,
+            endMinuteOfDay = element.intValue("end_minute_of_day"),
+            classType = element.stringValue("class_type"),
+            section = element.stringValue("section"),
+            venue = element.stringValue("venue"),
+            lecturer = element.stringValue("lecturer"),
+            weekPattern = element.stringValue("week_pattern"),
+            source = element.stringValue("source") ?: TimetableEntryEntity.SOURCE_MANUAL,
+        )
+    }
+
     private fun parseRemoteAssignment(element: JsonObject): RemoteAssignment? {
         return RemoteAssignment(
             id = element.stringValue("id") ?: return null,
@@ -707,6 +988,21 @@ class SupabaseSyncRepository(
         val name: String,
         val classDayOfWeek: Int?,
         val classStartMinuteOfDay: Int?,
+    )
+
+    private data class RemoteTimetableEntry(
+        val id: String,
+        val ownerUserId: String,
+        val courseId: String,
+        val dayOfWeek: Int,
+        val startMinuteOfDay: Int,
+        val endMinuteOfDay: Int?,
+        val classType: String?,
+        val section: String?,
+        val venue: String?,
+        val lecturer: String?,
+        val weekPattern: String?,
+        val source: String,
     )
 
     private data class RemoteAssignment(

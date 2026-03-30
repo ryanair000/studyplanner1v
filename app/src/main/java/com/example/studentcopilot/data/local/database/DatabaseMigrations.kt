@@ -39,6 +39,12 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        addTimetableEntriesTable(db)
+    }
+}
+
 private fun migrateToV4(database: SupportSQLiteDatabase) {
     rebuildCoursesTable(database)
     rebuildAssignmentsTable(database)
@@ -256,5 +262,57 @@ private fun addCourseScheduleColumns(database: SupportSQLiteDatabase) {
     )
     database.execSQL(
         "ALTER TABLE `courses` ADD COLUMN `classStartMinuteOfDay` INTEGER",
+    )
+}
+
+private fun addTimetableEntriesTable(database: SupportSQLiteDatabase) {
+    database.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `timetable_entries` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `remoteId` TEXT,
+            `ownerUserId` TEXT NOT NULL,
+            `courseId` INTEGER NOT NULL,
+            `dayOfWeek` INTEGER NOT NULL,
+            `startMinuteOfDay` INTEGER NOT NULL,
+            `endMinuteOfDay` INTEGER,
+            `classType` TEXT,
+            `section` TEXT,
+            `venue` TEXT,
+            `lecturer` TEXT,
+            `weekPattern` TEXT,
+            `source` TEXT NOT NULL,
+            FOREIGN KEY(`courseId`) REFERENCES `courses`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+        )
+        """.trimIndent(),
+    )
+    database.execSQL(
+        """
+        INSERT INTO `timetable_entries` (
+            `ownerUserId`,
+            `courseId`,
+            `dayOfWeek`,
+            `startMinuteOfDay`,
+            `source`
+        )
+        SELECT
+            `ownerUserId`,
+            `id`,
+            `classDayOfWeek`,
+            `classStartMinuteOfDay`,
+            'course_schedule'
+        FROM `courses`
+        WHERE `classDayOfWeek` IS NOT NULL
+            AND `classStartMinuteOfDay` IS NOT NULL
+        """.trimIndent(),
+    )
+    database.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_timetable_entries_courseId` ON `timetable_entries` (`courseId`)",
+    )
+    database.execSQL(
+        "CREATE INDEX IF NOT EXISTS `index_timetable_entries_ownerUserId` ON `timetable_entries` (`ownerUserId`)",
+    )
+    database.execSQL(
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_timetable_entries_ownerUserId_remoteId` ON `timetable_entries` (`ownerUserId`, `remoteId`)",
     )
 }
